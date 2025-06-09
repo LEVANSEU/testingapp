@@ -96,17 +96,7 @@ if report_file and statement_files:
     bank_df['P'] = bank_df.iloc[:, 15].astype(str).str.strip()
     bank_df['Amount'] = pd.to_numeric(bank_df.iloc[:, 3], errors='coerce').fillna(0)
 
-    missing_ids = bank_df[~bank_df['P'].isin(purchases_df['საიდენტიფიკაციო კოდი'])].copy()
-
-    with st.expander("📌 ამონაწერის ჩანაწერები, სადაც საიდენტიფიკაციო კოდი ვერ მოიძებნა"):
-        if not missing_ids.empty:
-            missing_ids["ახალი კოდი"] = ""
-            for i, row in missing_ids.iterrows():
-                new_code = st.text_input(f"ჩაწერე საიდენტიფიკაციო კოდი ჩანაწერისთვის ({row['P']}):", key=f"missing_{i}")
-                if new_code:
-                    bank_df.at[i, 'P'] = new_code
-
-    wb = Workbook()
+     wb = Workbook()
     wb.remove(wb.active)
 
     ws1 = wb.create_sheet(title="ანგარიშფაქტურები კომპანიით")
