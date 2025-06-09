@@ -129,44 +129,91 @@ if report_file and statement_files:
     wb.save(output)
     output.seek(0)
 
-    st.subheader("📋 კომპანიების ჩამონათვალი")
+    if 'selected_company' not in st.session_state:
+        st.subheader("📋 კომპანიების ჩამონათვალი")
 
-    search_code = st.text_input("🔎 ჩაწერე საიდენტიფიკაციო კოდი:", "")
-    sort_column = st.selectbox("📊 დალაგების ველი", ["ინვოისების ჯამი", "ჩარიცხვა", "სხვაობა"])
-    sort_order = st.radio("⬆️⬇️ დალაგების ტიპი", ["ზრდადობით", "კლებადობით"], horizontal=True)
+        search_code = st.text_input("🔎 ჩაწერე საიდენტიფიკაციო კოდი:", "")
+        sort_column = st.selectbox("📊 დალაგების ველი", ["ინვოისების ჯამი", "ჩარიცხვა", "სხვაობა"])
+        sort_order = st.radio("⬆️⬇️ დალაგების ტიპი", ["ზრდადობით", "კლებადობით"], horizontal=True)
 
-    sort_index = {"ინვოისების ჯამი": 2, "ჩარიცხვა": 3, "სხვაობა": 4}[sort_column]
-    reverse = sort_order == "კლებადობით"
+        sort_index = {"ინვოისების ჯამი": 2, "ჩარიცხვა": 3, "სხვაობა": 4}[sort_column]
+        reverse = sort_order == "კლებადობით"
 
-    filtered_summaries = company_summaries
-    if search_code.strip():
-        filtered_summaries = [item for item in company_summaries if item[1] == search_code.strip()]
+        filtered_summaries = company_summaries
+        if search_code.strip():
+            filtered_summaries = [item for item in company_summaries if item[1] == search_code.strip()]
 
-    filtered_summaries = sorted(filtered_summaries, key=lambda x: x[sort_index], reverse=reverse)
+        filtered_summaries = sorted(filtered_summaries, key=lambda x: x[sort_index], reverse=reverse)
 
-    st.markdown("""
-    <div class='summary-header'>
-        <div style='flex: 2;'>დასახელება</div>
-        <div style='flex: 2;'>საიდენტიფიკაციო კოდი</div>
-        <div style='flex: 1.5;'>ინვოისების ჯამი</div>
-        <div style='flex: 1.5;'>ჩარიცხვა</div>
-        <div style='flex: 1.5;'>სხვაობა</div>
-    </div>
-    """, unsafe_allow_html=True)
+        st.markdown("""
+        <div class='summary-header'>
+            <div style='flex: 2;'>დასახელება</div>
+            <div style='flex: 2;'>საიდენტიფიკაციო კოდი</div>
+            <div style='flex: 1.5;'>ინვოისების ჯამი</div>
+            <div style='flex: 1.5;'>ჩარიცხვა</div>
+            <div style='flex: 1.5;'>სხვაობა</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    for name, company_id, invoice_sum, paid_sum, difference in filtered_summaries:
-        col1, col2, col3, col4, col5 = st.columns([2, 2, 1.5, 1.5, 1.5])
-        with col1:
-            st.markdown(name)
-        with col2:
-            if st.button(f"{company_id}", key=f"id_{company_id}"):
-                st.session_state['selected_company'] = company_id
-        with col3:
-            st.markdown(f"<div class='number-cell'>{invoice_sum:,.2f}</div>", unsafe_allow_html=True)
-        with col4:
-            st.markdown(f"<div class='number-cell'>{paid_sum:,.2f}</div>", unsafe_allow_html=True)
-        with col5:
-            st.markdown(f"<div class='number-cell'>{difference:,.2f}</div>", unsafe_allow_html=True)
+        for name, company_id, invoice_sum, paid_sum, difference in filtered_summaries:
+            col1, col2, col3, col4, col5 = st.columns([2, 2, 1.5, 1.5, 1.5])
+            with col1:
+                st.markdown(name)
+            with col2:
+                if st.button(f"{company_id}", key=f"id_{company_id}"):
+                    st.session_state['selected_company'] = company_id
+            with col3:
+                st.markdown(f"<div class='number-cell'>{invoice_sum:,.2f}</div>", unsafe_allow_html=True)
+            with col4:
+                st.markdown(f"<div class='number-cell'>{paid_sum:,.2f}</div>", unsafe_allow_html=True)
+            with col5:
+                st.markdown(f"<div class='number-cell'>{difference:,.2f}</div>", unsafe_allow_html=True)
+
+    else:
+        selected_code = st.session_state['selected_company']
+        df_full = pd.read_excel(report_file, sheet_name='Grid')
+        df_full['დასახელება'] = df_full['გამყიდველი'].astype(str).apply(lambda x: re.sub(r'^\(\d+\)\s*', '', x).strip())
+        df_full['საიდენტიფიკაციო კოდი'] = df_full['გამყიდველი'].apply(lambda x: ''.join(re.findall(r'\d', str(x)))[:11])
+        matching_df = df_full[df_full['საიდენტიფიკაციო კოდი'] == selected_code]
+
+        if not matching_df.empty:
+            company_name = matching_df['დასახელება'].iloc[0]
+            st.subheader(f"🔎 ({selected_code}) {company_name} - ანგარიშფაქტურები")
+            st.dataframe(matching_df, use_container_width=True)
+
+            st.subheader("🔍 მოძებნე გუგლში მასალა ან მომსახურება")
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                search_term = st.text_input("ჩაწერე სახელი ან სიტყვა:")
+            with col2:
+                if st.button("ძებნა"):
+                    if search_term.strip():
+                        search_url = f"https://www.google.com/search?q={search_term.replace(' ', '+')}"
+                        st.markdown(f"[🌐 გადადი გუგლზე]({search_url})", unsafe_allow_html=True)
+                    else:
+                        st.warning("გთხოვ ჩაწერე ტექსტი ძებნამდე.")
+
+            company_output = io.BytesIO()
+            company_wb = Workbook()
+            ws = company_wb.active
+            ws.title = company_name[:31]
+            ws.append(matching_df.columns.tolist())
+            for row in matching_df.itertuples(index=False):
+                ws.append(row)
+            company_wb.save(company_output)
+            company_output.seek(0)
+
+            st.download_button(
+                label=f"⬇️ ჩამოტვირთე {company_name} ინვოისების Excel",
+                data=company_output,
+                file_name=f"{company_name}_ინვოისები.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        else:
+            st.warning("📭 ჩანაწერი ვერ მოიძებნა ამ კომპანიისთვის.")
+
+        if st.button("⬅️ დაბრუნება სრულ სიაზე"):
+            del st.session_state['selected_company']
 
     st.download_button(
         label="⬇️ ჩამოტვირთე Excel ფაილი",
