@@ -85,7 +85,6 @@ statement_files = st.file_uploader("📄 ატვირთე საბან�
 if report_file and statement_files:
     purchases_df = pd.read_excel(report_file, sheet_name='Grid')
 
-    # Read and merge all statement files
     bank_dfs = []
     for file in statement_files:
         df = pd.read_excel(file)
@@ -130,7 +129,21 @@ if report_file and statement_files:
     wb.save(output)
     output.seek(0)
 
-    st.markdown("### 📋 კომპანიების ჩამონათვალი")
+    st.subheader("📋 კომპანიების ჩამონათვალი")
+
+    search_code = st.text_input("🔎 ჩაწერე საიდენტიფიკაციო კოდი:", "")
+    sort_column = st.selectbox("📊 დალაგების ველი", ["ინვოისების ჯამი", "ჩარიცხვა", "სხვაობა"])
+    sort_order = st.radio("⬆️⬇️ დალაგების ტიპი", ["ზრდადობით", "კლებადობით"], horizontal=True)
+
+    sort_index = {"ინვოისების ჯამი": 2, "ჩარიცხვა": 3, "სხვაობა": 4}[sort_column]
+    reverse = sort_order == "კლებადობით"
+
+    filtered_summaries = company_summaries
+    if search_code.strip():
+        filtered_summaries = [item for item in company_summaries if item[1] == search_code.strip()]
+
+    filtered_summaries = sorted(filtered_summaries, key=lambda x: x[sort_index], reverse=reverse)
+
     st.markdown("""
     <div class='summary-header'>
         <div style='flex: 2;'>დასახელება</div>
@@ -141,7 +154,7 @@ if report_file and statement_files:
     </div>
     """, unsafe_allow_html=True)
 
-    for name, company_id, invoice_sum, paid_sum, difference in company_summaries:
+    for name, company_id, invoice_sum, paid_sum, difference in filtered_summaries:
         col1, col2, col3, col4, col5 = st.columns([2, 2, 1.5, 1.5, 1.5])
         with col1:
             st.markdown(name)
