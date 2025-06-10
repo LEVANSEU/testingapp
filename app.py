@@ -3,6 +3,7 @@ import pandas as pd
 import io
 from openpyxl import Workbook
 import re
+import uuid
 
 st.set_page_config(layout="wide")
 st.markdown("""
@@ -63,40 +64,32 @@ st.markdown("""
             font-weight: bold;
             color: #222;
         }
-        .stSelectbox > div, .stRadio > div, .stTextInput > div, .stButton > div {
-            background-color: #f5f5f5 !important;
-        }
-        .stSelectbox > div *,
-        .stRadio > div *,
-        .stTextInput > div * {
-            color: #222 !important;
-        }
-        .stRadio div[role="radiogroup"] label span {
-            font-weight: bold !important;
-        }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("Excel გენერატორი")
 
-report_file = st.file_uploader("📄 ატვირთე ანგარიშფაქტურების ფაილი (report.xlsx)", type=["xlsx"])
-statement_files = st.file_uploader("📄 ატვირთე საბანკო ამონაწერის ფაილები (statement.xlsx)", type=["xlsx"], accept_multiple_files=True)
+report_file = st.file_uploader("ატვირთე ანგარიშფაქტურების ფაილი (report.xlsx)", type=["xlsx"])
+statement_files = st.file_uploader("ატვირთე საბანკო ამონაწერის ფაილები (statement.xlsx)", type=["xlsx"], accept_multiple_files=True)
 
 if report_file and statement_files:
     purchases_df = pd.read_excel(report_file, sheet_name='Grid')
-
+    
+    # Process multiple bank statement files
     bank_dfs = []
-    for file in statement_files:
-        df = pd.read_excel(file)
+    for statement_file in statement_files:
+        df = pd.read_excel(statement_file)
+        df['P'] = df.iloc[:, 15].astype(str).str.strip()
+        df['Amount'] = pd.to_numeric(df.iloc[:, 3], errors='coerce').fillna(0)
         bank_dfs.append(df)
-    bank_df = pd.concat(bank_dfs, ignore_index=True)
+    
+    # Combine all bank statement DataFrames
+    bank_df = pd.concat(bank_dfs, ignore_index=True) if bank_dfs else pd.DataFrame()
 
     purchases_df['დასახელება'] = purchases_df['გამყიდველი'].astype(str).apply(lambda x: re.sub(r'^\(\d+\)\s*', '', x).strip())
     purchases_df['საიდენტიფიკაციო კოდი'] = purchases_df['გამყიდველი'].apply(lambda x: ''.join(re.findall(r'\d', str(x)))[:11])
-    bank_df['P'] = bank_df.iloc[:, 15].astype(str).str.strip()
-    bank_df['Amount'] = pd.to_numeric(bank_df.iloc[:, 3], errors='coerce').fillna(0)
 
-     wb = Workbook()
+    wb = Workbook()
     wb.remove(wb.active)
 
     ws1 = wb.create_sheet(title="ანგარიშფაქტურები კომპანიით")
@@ -150,7 +143,7 @@ if report_file and statement_files:
             with col1:
                 st.markdown(name)
             with col2:
-                if st.button(f"{company_id}", key=f"id_{company_id}"):
+                if st.button(f"{company_id}", key=f"id_{company_id}_{str(uuid.uuid4())}"):
                     st.session_state['selected_company'] = company_id
             with col3:
                 st.markdown(f"<div class='number-cell'>{invoice_sum:,.2f}</div>", unsafe_allow_html=True)
@@ -204,10 +197,3 @@ if report_file and statement_files:
 
         if st.button("⬅️ დაბრუნება სრულ სიაზე"):
             del st.session_state['selected_company']
-
-    st.download_button(
-        label="⬇️ ჩამოტვირთე Excel ფაილი",
-        data=output,
-        file_name="საბოლოო_ფაილი.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
