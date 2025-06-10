@@ -86,6 +86,18 @@ if report_file and statement_files:
     # Combine all bank statement DataFrames
     bank_df = pd.concat(bank_dfs, ignore_index=True) if bank_dfs else pd.DataFrame()
 
+    # Identify rows where P is missing or invalid
+    missing_p_rows = bank_df[bank_df['P'].str.match(r'^\s*$') | bank_df['P'].isna()].copy()
+    if not missing_p_rows.empty:
+        st.warning("⚠ ამონაწერის ჩანაწერები, სადაც საიდენტიფიკაციო კოდი ვერ მოიძებნა")
+        st.dataframe(missing_p_rows)
+
+        # Allow manual entry of P codes
+        for index, row in missing_p_rows.iterrows():
+            manual_p = st.text_input(f"ჩაწერე საიდენტიფიკაციო კოდი ჩანაწერისთვის {index}:", key=f"manual_p_{index}")
+            if manual_p and manual_p.strip():
+                bank_df.loc[index, 'P'] = manual_p.strip()
+
     purchases_df['დასახელება'] = purchases_df['გამყიდველი'].astype(str).apply(lambda x: re.sub(r'^\(\d+\)\s*', '', x).strip())
     purchases_df['საიდენტიფიკაციო კოდი'] = purchases_df['გამყიდველი'].apply(lambda x: ''.join(re.findall(r'\d', str(x)))[:11])
 
